@@ -59,6 +59,7 @@ button:active:not(:disabled){transform:scale(.97);}
 .interp-aspect .interp-label{color:#A8C4E0;}
 .interp-planet .interp-label{color:#D4AF37;}
 .interp-day    .interp-label{color:#90C490;}
+.interp-day-time{font-size:12px;color:#90C490;opacity:0.8;margin-bottom:6px;font-family:'Courier New',monospace;}
 .interp-exact  .interp-label{color:#7A8BA8;}
 .interp-text{font-size:12.5px;line-height:1.6;color:#B8C8D8;margin-bottom:10px;}
 .interp-tips .interp-tip{font-size:12.5px;line-height:1.6;color:#E8D9A0;padding:5px 10px 5px 12px;margin-bottom:4px;border-left:2px solid rgba(212,175,55,.4);border-radius:0 4px 4px 0;background:rgba(212,175,55,.05);}
@@ -718,6 +719,18 @@ function lunarDayAt(date, newMoons) {
   return Math.floor((date-prev)/864e5)+1;
 }
 
+function lunarDayBounds(date, newMoons) {
+  // Возвращает {start, end, day} для лунных суток в которые попадает дата
+  // Лунные сутки = 864e5 мс (24ч) от новолуния
+  let prev=null;
+  for(const nm of newMoons){ if(nm<=date) prev=nm; else break; }
+  if(!prev) return null;
+  const dayNum = Math.floor((date-prev)/864e5);
+  const dayStart = new Date(prev.getTime() + dayNum * 864e5);
+  const dayEnd   = new Date(prev.getTime() + (dayNum+1) * 864e5);
+  return { day: dayNum+1, start: dayStart, end: dayEnd };
+}
+
 function findSignChanges(start, end) {
   const changes=[];
   let prevSign=signOf(eclLon(Astronomy.Body.Moon, start));
@@ -884,7 +897,10 @@ async function computeWindows(monthStart, monthEnd, onProgress) {
       const ws=w.start<monthStart?monthStart:w.start;
       const we=w.end>monthEnd?monthEnd:w.end;
       const ld=lunarDayAt(new Date(ws),newMoons);
-      return {start:ws, end:we, lunarDay:ld, planetKey:w.sourceAspect.planetKey,
+      const ldb=lunarDayBounds(new Date(ws),newMoons);
+      return {start:ws, end:we, lunarDay:ld,
+              lunarDayStart:ldb?ldb.start:null, lunarDayEnd:ldb?ldb.end:null,
+              planetKey:w.sourceAspect.planetKey,
               aspectName:w.sourceAspect.aspectName, exact:w.sourceAspect.exact,
               moonSign:signOf(eclLon(Astronomy.Body.Moon,new Date(ws)))};
     })
@@ -1008,6 +1024,9 @@ function renderWindows(windows, tz, monthIdx) {
 
           <div class="interp-section interp-day">
             <div class="interp-label">🌙 ${w.lunarDay}-е лунные сутки · ${dayInfo?dayInfo.symbol:''}</div>
+            <div class="interp-day-time">
+              Начало: ${w.lunarDayStart?fmtTime(w.lunarDayStart,tz):'—'} &nbsp;·&nbsp; Конец: ${w.lunarDayEnd?fmtTime(w.lunarDayEnd,tz):'—'}
+            </div>
             <div class="interp-text">${dayInfo?dayInfo.essence:''}</div>
             ${dayAdvice?`<div class="interp-ritual">${dayAdvice}</div>`:''}
           </div>
